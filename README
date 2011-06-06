@@ -1,0 +1,66 @@
+DBIx::JoinedColumnsAggregator
+=================
+NAME
+    DBIx::JoinedColumnsAggregator - aggregating joined values
+
+SYNOPSYS
+        use DBIx::JoinedColumnsAggregator;
+    
+        # using DBI
+        use DBI;
+    
+        my $dbh = DBI->connect( 'dbi:SQLite:your_data', '', '' );
+        my $sth = $dbh->prepare( $a_sql_having_lef_join_closures );
+    
+        $sth->execute();
+    
+        my @data = $aggregate_joined_columns( $sth, {
+            pk => ['id'],
+            refs => {
+                product_codes => ['product_code'],
+                groups        => ['group_id', 'group_name'],
+            },
+            access_style => 'hash',
+            next_method  => 'fetchrow_hashref',
+        } );
+    
+        for my $data ( @data ) {
+            # $data->{ product_codes } return an array referance of 'product_code'
+            # $data->{ groups } return an array ref 
+            #               of hash refs having 'group_id' and 'group_name'.
+        }
+    
+        # using ORM like DBIx::Skinny or Teng or etc.
+        # use and setup the module...
+        # ...
+        my $itr = $skinny->search_by_sql( $a_sql_having_lef_join_closures );
+        my $data = $aggregate_joined_columns( $itr, {
+            pk => ['id'],
+            refs => {
+                product_codes => ['product_code'],
+                groups        => ['group_id'],
+            },
+            setter => sub {
+                my ( $object, $tag, $rows ) = @_;
+                $object->{ extra }->{ $tag } = $rows;
+            },
+        } );
+    
+        for my $data ( @{$data} ) {
+            # $data->{ extra }->{ product_codes } return a list ref of 'product_code'
+            # $data->{ extra }->{ groups } return a llist ref 
+            #                        of hash refs having 'group_id' and 'group_name'.
+        }
+
+DESCRIPTION
+    This module provides a function which aggregates joined columns.
+
+AUTHOR
+    Makamaka Hannyaharamitu, <makamaka[at]cpan.org>
+
+COPYRIGHT AND LICENSE
+    Copyright 2011 by Makamaka Hannyaharamitu
+
+    This library is free software; you can redistribute it and/or modify it
+    under the same terms as Perl itself.
+
