@@ -175,9 +175,29 @@ DBIx::JoinedColumnsAggregator - aggregating joined values
 
 =head1 DESCRIPTION
 
-This module provides a function which aggregates joined columns.
+This module provides a function which aggregates joined columns
+in using L<DBI> or L<DBIx::Skinny> or L<Teng> and so on.
 
+You tell C<pk> (primary key) and C<tags> to the function.
+C<pk> is used to determine representative objects.
+C<tags> is used to determine target columns and a key name
+for accessing the aggregated data.
 
+=head2 FLLOW
+
+    * Takes an iterator and iterates to get data objects.
+    
+    * Makes each first objects with primary key value representative objects.
+    
+    * Aggregates target columns exception of duplicated value.
+    
+    * Sets aggregated data into the representative objects.
+    
+    * Returns a list referance of the representative objects.
+
+NOTE: Duplicated value are ignored. So if you want to aggregate them,
+add other unique constrained column (ex. foreign key) into C<tags>
+option.
 
 =head1 FUNCTION
 
