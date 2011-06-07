@@ -15,7 +15,7 @@ our $VERSION = '0.01';
 sub aggregate_joined_columns {
     my ( $itr, $opt ) = @_;
 
-    Carp::croak("Set pk and refs.") unless $opt->{ pk } and $opt->{ refs };
+    Carp::croak("Set pk and tags.") unless $opt->{ pk } and $opt->{ tags };
 
     if ( ref( $itr ) eq 'ARRAY' ) {
         return wantarray ? () : [] unless @$itr;
@@ -23,7 +23,7 @@ sub aggregate_joined_columns {
     }
 
     my @pks        = ref $opt->{ pk } ? @{ $opt->{ pk } } : $opt->{ pk };
-    my $refs       = $opt->{ refs };
+    my $tags       = $opt->{ tags };
     my $setter     = $opt->{ setter } || sub { $_[0]->{ $_[1] } = $_[2] };
     my $nextmethod = $opt->{ next_method } || 'next';
 
@@ -37,10 +37,10 @@ sub aggregate_joined_columns {
 
     # prepare joined columns data
     my ( $cols, $alias );
-    my @refs = keys %$refs;
-    for my $ref_name ( @refs ) {
-        $cols->{ $ref_name }  = [ map { ref($_) ?  $_->[0] : $_ } @{ $refs->{ $ref_name } } ];
-        $alias->{ $ref_name } = { map { ref($_) ? ($_->[0] => $_->[1]) : ($_ => $_)  } @{ $refs->{ $ref_name } } };
+    my @tags = keys %$tags;
+    for my $ref_name ( @tags ) {
+        $cols->{ $ref_name }  = [ map { ref($_) ?  $_->[0] : $_ } @{ $tags->{ $ref_name } } ];
+        $alias->{ $ref_name } = { map { ref($_) ? ($_->[0] => $_->[1]) : ($_ => $_)  } @{ $tags->{ $ref_name } } };
     }
 
     my %fetched;
@@ -58,7 +58,7 @@ sub aggregate_joined_columns {
             push @representatives, $fetched{ $pk };
         }
 
-        for my $ref_name ( @refs ) { # access joined data
+        for my $ref_name ( @tags ) { # access joined data
             my $cols  = $cols->{ $ref_name };
             my $alias = $alias->{ $ref_name };
             my @items = $row_object ? map { $alias->{ $_ } => $object->{$_} } @$cols
@@ -66,7 +66,7 @@ sub aggregate_joined_columns {
                       :               map { $alias->{ $_ } => $object->$_() } @$cols;
 
              next if $found_values->{ $pk }->{ $ref_name }
-                                    ->{ join( "\0", map { defined $_ ? $_ : '\0NULL\0' } @items ) }++;
+                                    ->{ join( "\0", map { defined $_ ? $_ : "\0NULL\0" } @items ) }++;
              push @{ $fetched{ $pk }->{ rows }->{ $ref_name } }, scalar(@$cols) == 1 ? $items[1] : { @items };
         }
     }
@@ -75,7 +75,7 @@ sub aggregate_joined_columns {
     for my $obj_and_rows ( @representatives ) {
         my $object = $obj_and_rows->{ object };
 
-        for my $ref_name ( @refs ) {
+        for my $ref_name ( @tags ) {
             my $rows = $obj_and_rows->{ rows }->{ $ref_name };
 
             if ( @$rows == 1 ) { # Is joined result a null?
@@ -135,7 +135,7 @@ DBIx::JoinedColumnsAggregator - aggregating joined values
     
     my @data = $aggregate_joined_columns( $sth, {
         pk => ['id'],
-        refs => {
+        tags => {
             product_codes => ['product_code'],
             groups        => ['group_id', 'group_name'],
         },
@@ -144,9 +144,9 @@ DBIx::JoinedColumnsAggregator - aggregating joined values
     } );
     
     for my $data ( @data ) {
-        # $data->{ product_codes } return an array referance of 'product_code'
-        # $data->{ groups } return an array ref 
-        #               of hash refs having 'group_id' and 'group_name'.
+        # $data->{ product_codes } return a list ref of 'product_code'
+        # $data->{ groups } return a list ref of hash ref
+        #                          having 'group_id' and 'group_name'.
     }
     
     # using ORM like DBIx::Skinny or Teng or etc.
@@ -155,7 +155,7 @@ DBIx::JoinedColumnsAggregator - aggregating joined values
     my $itr = $skinny->search_by_sql( $a_sql_having_lef_join_closures );
     my $data = $aggregate_joined_columns( $itr, {
         pk => ['id'],
-        refs => {
+        tags => {
             product_codes => ['product_code'],
             groups        => ['group_id'],
         },
@@ -167,8 +167,8 @@ DBIx::JoinedColumnsAggregator - aggregating joined values
     
     for my $data ( @{$data} ) {
         # $data->{ extra }->{ product_codes } return a list ref of 'product_code'
-        # $data->{ extra }->{ groups } return a llist ref 
-        #                        of hash refs having 'group_id' and 'group_name'.
+        # $data->{ extra }->{ groups } return a list ref of hash ref
+        #                                   having 'group_id' and 'group_name'.
     }
     
 
@@ -234,7 +234,7 @@ or a list (list context).
     
     my $recipes = $aggregate_joined_columns( $sth, {
         pk => ['id'],
-        refs => {
+        tags => {
             product_codes => ['product_code'],
             groups        => ['group_id', 'group_name'],
         },
@@ -276,18 +276,18 @@ if there is a single primary key, the below code is acceptable too.
 
     pk => 'id'
 
-=item refs
+=item tags
 
 A hash reference of tags for grouping and columns .
 
-    refs => {
+    tags => {
         $group_tag1 => [ @tag1_columns ],
         $group_tag2 => [ @tag2_columns ],
     }
 
 Can use array references to set column alias.
 
-    refs => {
+    tags => {
         'books' => [ ['book_id' => 'id'], ['books_title' => 'title'], ... ],
         ...
     }
@@ -298,7 +298,7 @@ Can use array references to set column alias.
 
 Note: single column with an alias in a tag is ignored.
 
-    refs => {
+    tags => {
         'books' => [ ['book_id' => 'id'] ],
         ...
     }
@@ -339,7 +339,7 @@ And 'method' equivalent to:
 A subroutine reference that sets aggregated values to objects.
 Four arguments are passed into it.
 First is an object expected to have aggreaged values.
-Second is a group tag set by C<refs> option.
+Second is a group tag set by C<tags> option.
 Third is an aggregated values.
 Last is an option hash reference passed to aggregate_joined_columns.
 

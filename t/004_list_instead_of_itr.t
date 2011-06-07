@@ -43,7 +43,7 @@ while ( my $hash = $sth->fetchrow_hashref ) {
 
 $list = aggregate_joined_columns( \@objects, {
     pk => ['id'],
-    refs => {
+    tags => {
         books   => ['book_id', 'title'],
         groups  => ['group_id'],
     },

@@ -14,7 +14,7 @@ ok( $@ );
 
 my $list = aggregate_joined_columns( [], {
     pk => ['id'],
-    refs => {
+    tags => {
         books   => ['book_id', 'title'],
     },
 } );

@@ -34,7 +34,7 @@ ok( $sth->execute );
 eval {
     aggregate_joined_columns( $sth, {
         pk => ['id'],
-        refs => {
+        tags => {
             books   => ['book_id', 'title'],
             groups  => ['group_id'],
         },
@@ -49,7 +49,7 @@ like( $@, qr/Iterator must have/ );
 
 $list = aggregate_joined_columns( $sth, {
     pk => ['id'],
-    refs => {
+    tags => {
         books   => ['book_id', 'title'],
         groups  => ['group_id'],
     },
@@ -82,7 +82,7 @@ $sth->execute;
 
 $list = aggregate_joined_columns( $sth, {
     pk => ['id'],
-    refs => {
+    tags => {
         books   => ['book_id'],
         groups  => ['group_id', 'group_name'],
     },
@@ -120,7 +120,7 @@ $sth->execute;
 
 $list = aggregate_joined_columns( $sth, {
     pk => ['id'],
-    refs => {},
+    tags => {},
     access_style => 'hash',
     next_method  => 'fetchrow_hashref',
 } );

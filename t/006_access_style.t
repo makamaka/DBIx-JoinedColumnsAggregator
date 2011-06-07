@@ -44,7 +44,7 @@ my $itr = DummyTestIterator->new( \@objects );
 
 $list = aggregate_joined_columns( $itr, {
     pk => ['id'],
-    refs => {
+    tags => {
         books   => ['book_id', 'title'],
         groups  => ['group_id'],
     },
@@ -95,7 +95,7 @@ $itr = DummyTestIterator2->new( \@objects );
 
 $list = aggregate_joined_columns( $itr, {
     pk => ['id'],
-    refs => {
+    tags => {
         books   => ['book_id', 'title'],
         groups  => ['group_id'],
     },
