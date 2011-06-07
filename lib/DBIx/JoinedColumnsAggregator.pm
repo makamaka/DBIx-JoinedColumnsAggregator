@@ -26,7 +26,7 @@ sub aggregate_joined_columns {
     my $tags       = $opt->{ tags };
     my $setter     = $opt->{ setter } || sub { $_[0]->{ $_[1] } = $_[2] };
     my $nextmethod = $opt->{ next_method } || 'next';
-
+    my $alwayshash = $opt->{ always_hash };
     my $row_object = ($opt->{ access_style } and $opt->{ access_style } eq 'hash') ? 1 : 0;
     my $getter     = ($opt->{ access_style } && ref($opt->{ access_style }) eq 'CODE')
                                                             ? $opt->{ access_style } : undef;
@@ -67,7 +67,8 @@ sub aggregate_joined_columns {
 
              next if $found_values->{ $pk }->{ $ref_name }
                                     ->{ join( "\0", map { defined $_ ? $_ : "\0NULL\0" } @items ) }++;
-             push @{ $fetched{ $pk }->{ rows }->{ $ref_name } }, scalar(@$cols) == 1 ? $items[1] : { @items };
+             push @{ $fetched{ $pk }->{ rows }->{ $ref_name } },
+                                    ( $alwayshash || scalar(@$cols) > 1 ) ? { @items } : $items[1];
         }
     }
 
@@ -364,6 +365,23 @@ C<next> by default.
 If you pass a list reference into aggregate_joined_columns instead of an iterator,
 you should not set C<netx_method>. Because the list reference is wrapped by
 a dummy iterator class using C<next> method in that case.
+
+=item always_hash
+
+Single target column are aggregated as scalar value.
+If you set the option with true value, aggregated as hash reference.
+
+    tags => {
+        books => [ 'book_id' ],
+    }
+    # => $object->{ books } : [ 100, 123, .... ]
+    
+    
+    always_hash => 1,
+    tags => {
+        books => [ 'book_id' ],
+    }
+    # => $object->{ books } : [ { book_id => 100 }, { book_id => 123}, .... ]
 
 =back
 
