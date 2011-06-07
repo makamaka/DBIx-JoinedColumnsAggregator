@@ -31,13 +31,21 @@ sub aggregate_joined_columns {
     my $getter     = ($opt->{ access_style } && ref($opt->{ access_style }) eq 'CODE')
                                                             ? $opt->{ access_style } : undef;
 
-    my %fetched;
-    my @representatives;
-    my $found_values = {};
-
     if ( not $itr->can( $nextmethod ) ) {
         Carp::croak("Iterator must have '$nextmethod' method.");
     }
+
+    # prepare joined columns data
+    my ( $cols, $alias );
+    my @refs = keys %$refs;
+    for my $ref_name ( @refs ) {
+        $cols->{ $ref_name }  = [ map { ref($_) ?  $_->[0] : $_ } @{ $refs->{ $ref_name } } ];
+        $alias->{ $ref_name } = { map { ref($_) ? ($_->[0] => $_->[1]) : ($_ => $_)  } @{ $refs->{ $ref_name } } };
+    }
+
+    my %fetched;
+    my @representatives;
+    my $found_values = {};
 
     # aggregation
     while ( my $object = $itr->$nextmethod() ) {
@@ -50,14 +58,16 @@ sub aggregate_joined_columns {
             push @representatives, $fetched{ $pk };
         }
 
-        for my $ref_name ( keys %$refs ) { # access joined data
-            my @cols  = @{ $refs->{ $ref_name } };
-            my @items = $row_object ? map { $_ => $object->{$_} } @cols
-                      : $getter     ? map { $getter->( $object, $_ ) } @cols
-                      :               map { $_ => $object->$_() } @cols;
+        for my $ref_name ( @refs ) { # access joined data
+            my $cols  = $cols->{ $ref_name };
+            my $alias = $alias->{ $ref_name };
+            my @items = $row_object ? map { $alias->{ $_ } => $object->{$_} } @$cols
+                      : $getter     ? map { $getter->( $object, $_ ) } @$cols
+                      :               map { $alias->{ $_ } => $object->$_() } @$cols;
+
              next if $found_values->{ $pk }->{ $ref_name }
                                     ->{ join( "\0", map { defined $_ ? $_ : '\0NULL\0' } @items ) }++;
-             push @{ $fetched{ $pk }->{ rows }->{ $ref_name } }, scalar(@cols) == 1 ? $items[1] : { @items };
+             push @{ $fetched{ $pk }->{ rows }->{ $ref_name } }, scalar(@$cols) == 1 ? $items[1] : { @items };
         }
     }
 
@@ -65,16 +75,13 @@ sub aggregate_joined_columns {
     for my $obj_and_rows ( @representatives ) {
         my $object = $obj_and_rows->{ object };
 
-        for my $ref_name ( keys %$refs ) {
-            my $rows   = $obj_and_rows->{ rows }->{ $ref_name };
-
-            next unless $rows;
+        for my $ref_name ( @refs ) {
+            my $rows = $obj_and_rows->{ rows }->{ $ref_name };
 
             if ( @$rows == 1 ) { # Is joined result a null?
                 my $row = $rows->[0];
                 my $val = ref($row) eq 'HASH'  ?
                                         (scalar(grep { !defined } values %{ $row }) != scalar(keys %{ $row }))
-                        : ref($row) eq 'ARRAY' ? defined($row)
                         : defined($row);
                 $rows = [] unless $val;
             }
