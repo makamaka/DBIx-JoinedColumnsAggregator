@@ -62,7 +62,7 @@ sub aggregate_joined_columns {
             my $cols  = $cols->{ $ref_name };
             my $alias = $alias->{ $ref_name };
             my @items = $row_object ? map { $alias->{ $_ } => $object->{$_} } @$cols
-                      : $getter     ? map { $getter->( $object, $_ ) } @$cols
+                      : $getter     ? map { $alias->{ $_ } => $getter->( $object, $_ ) } @$cols
                       :               map { $alias->{ $_ } => $object->$_() } @$cols;
 
              next if $found_values->{ $pk }->{ $ref_name }

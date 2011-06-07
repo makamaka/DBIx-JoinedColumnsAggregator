@@ -8,4 +8,5 @@ t/002_fetch_as_one_row.t
 t/003_fetch_many_rows.t
 t/004_list_instead_of_itr.t
 t/005_alias.t
+t/006_access_style.t
 t/lib/setup.pl
