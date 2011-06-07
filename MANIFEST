@@ -7,4 +7,5 @@ t/001_use.t
 t/002_fetch_as_one_row.t
 t/003_fetch_many_rows.t
 t/004_list_instead_of_itr.t
+t/005_alias.t
 t/lib/setup.pl
