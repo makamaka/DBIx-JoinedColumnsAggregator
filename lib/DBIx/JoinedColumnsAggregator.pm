@@ -285,17 +285,60 @@ A hash reference of tags for grouping and columns .
         $group_tag2 => [ @tag2_columns ],
     }
 
+Can use array references to set column alias.
+
+    refs => {
+        'books' => [ ['book_id' => 'id'], ['books_title' => 'title'], ... ],
+        ...
+    }
+    
+    ...
+    
+    $data->{'books'}->[0]->{'id'}; # get column value instead of 'book_id'
+
+Note: single column with an alias in a tag is ignored.
+
+    refs => {
+        'books' => [ ['book_id' => 'id'] ],
+        ...
+    }
+    
+    ...
+    
+    $data->{'books'}->[0]; # get value directly
+
+
 =item access_style
 
-'hash' or 'method' or a code reference are acceptable.
-
+Getting objects values style. 'hash' or 'method' or a code reference are acceptable.
 'method' by default.
+
+You can set a subroutin reference to access data flexibly.
+
+    access_style => sub {
+        my ( $object, $column_name ) = @_;
+        return $object->get_column( $column_name );
+    }
+
+So 'hash' is equivalent to:
+
+    access_style => sub {
+        my ( $object, $column_name ) = @_;
+        return $object->{ $column_name };
+    }
+
+And 'method' equivalent to:
+
+    access_style => sub {
+        my ( $object, $column_name ) = @_;
+        return $object->$column_name();
+    }
 
 =item setter
 
 A subroutine reference that sets aggregated values to objects.
 Four arguments are passed into it.
-First is an object expected to have aggreaged vlues.
+First is an object expected to have aggreaged values.
 Second is a group tag set by C<refs> option.
 Third is an aggregated values.
 Last is an option hash reference passed to aggregate_joined_columns.
