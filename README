@@ -16,7 +16,7 @@ SYNOPSYS
     
         my @data = $aggregate_joined_columns( $sth, {
             pk => ['id'],
-            refs => {
+            tags => {
                 product_codes => ['product_code'],
                 groups        => ['group_id', 'group_name'],
             },
@@ -25,9 +25,9 @@ SYNOPSYS
         } );
     
         for my $data ( @data ) {
-            # $data->{ product_codes } return an array referance of 'product_code'
-            # $data->{ groups } return an array ref 
-            #               of hash refs having 'group_id' and 'group_name'.
+            # $data->{ product_codes } return a list ref of 'product_code'
+            # $data->{ groups } return a list ref of hash ref
+            #                          having 'group_id' and 'group_name'.
         }
     
         # using ORM like DBIx::Skinny or Teng or etc.
@@ -36,7 +36,7 @@ SYNOPSYS
         my $itr = $skinny->search_by_sql( $a_sql_having_lef_join_closures );
         my $data = $aggregate_joined_columns( $itr, {
             pk => ['id'],
-            refs => {
+            tags => {
                 product_codes => ['product_code'],
                 groups        => ['group_id'],
             },
@@ -48,12 +48,32 @@ SYNOPSYS
     
         for my $data ( @{$data} ) {
             # $data->{ extra }->{ product_codes } return a list ref of 'product_code'
-            # $data->{ extra }->{ groups } return a llist ref 
-            #                        of hash refs having 'group_id' and 'group_name'.
+            # $data->{ extra }->{ groups } return a list ref of hash ref
+            #                                   having 'group_id' and 'group_name'.
         }
 
 DESCRIPTION
-    This module provides a function which aggregates joined columns.
+    This module provides a function which aggregates joined columns in using
+    DBI or DBIx::Skinny or Teng and so on.
+
+    You tell "pk" (primary key) and "tags" to the function. "pk" is used to
+    determine representative objects. "tags" is used to determine target
+    columns and a key name for accessing the aggregated data.
+
+  FLLOW
+        * Takes an iterator and iterates to get data objects.
+    
+        * Makes each first objects with primary key value representative objects.
+    
+        * Aggregates target columns exception of duplicated value.
+    
+        * Sets aggregated data into the representative objects.
+    
+        * Returns a list referance of the representative objects.
+
+    NOTE: Duplicated value are ignored. So if you want to aggregate them,
+    add other unique constrained column (ex. foreign key) into "tags"
+    option.
 
 AUTHOR
     Makamaka Hannyaharamitu, <makamaka[at]cpan.org>
