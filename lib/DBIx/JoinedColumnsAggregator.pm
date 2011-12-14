@@ -134,7 +134,7 @@ DBIx::JoinedColumnsAggregator - aggregating joined values
     
     $sth->execute();
     
-    my @data = $aggregate_joined_columns( $sth, {
+    my @data = aggregate_joined_columns( $sth, {
         pk => ['id'],
         tags => {
             product_codes => ['product_code'],
