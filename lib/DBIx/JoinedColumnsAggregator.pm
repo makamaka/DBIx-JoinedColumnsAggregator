@@ -38,9 +38,18 @@ sub aggregate_joined_columns {
     # prepare joined columns data
     my ( $cols, $alias );
     my @tags = keys %$tags;
+    my @nest;
     for my $ref_name ( @tags ) {
-        $cols->{ $ref_name }  = [ map { ref($_) ?  $_->[0] : $_ } @{ $tags->{ $ref_name } } ];
-        $alias->{ $ref_name } = { map { ref($_) ? ($_->[0] => $_->[1]) : ($_ => $_)  } @{ $tags->{ $ref_name } } };
+        $cols->{ $ref_name }  = [ map {
+             ref($_) eq 'ARRAY' ?  $_->[0]
+           : ref($_) eq 'HASH'  ?  _nested_cols( $_, $ref_name, $opt, \@nest )
+           : $_;
+        } @{ $tags->{ $ref_name } } ];
+        $alias->{ $ref_name } = { map {
+             ref($_) eq 'ARRAY' ? ($_->[0] => $_->[1])
+           : ref($_) eq 'HASH'  ?  _nested_alias( $_ )
+           : ($_ => $_)
+        } @{ $tags->{ $ref_name } } };
     }
 
     my %fetched;
@@ -64,7 +73,6 @@ sub aggregate_joined_columns {
             my @items = $row_object ? map { $alias->{ $_ } => $object->{$_} } @$cols
                       : $getter     ? map { $alias->{ $_ } => $getter->( $object, $_ ) } @$cols
                       :               map { $alias->{ $_ } => $object->$_() } @$cols;
-
              next if $found_values->{ $pk }->{ $ref_name }
                                     ->{ join( "\0", map { defined $_ ? $_ : "\0NULL\0" } @items ) }++;
              push @{ $fetched{ $pk }->{ rows }->{ $ref_name } },
@@ -91,9 +99,59 @@ sub aggregate_joined_columns {
         }
     }
 
-    return wantarray ? ( map { $_->{ object } } @representatives )
-                     : [ map { $_->{ object } } @representatives ];
+    my @objects = map { $_->{ object } } @representatives;
+
+    # nest
+    for my $nest ( @nest ) {
+        my $tag = $nest->[0];
+        my $opt = $nest->[1];
+        my $setter     = $opt->{ setter } || sub { $_[0]->{ $_[1] } = $_[2] };
+        my $row_object = ($opt->{ access_style } and $opt->{ access_style } eq 'hash') ? 1 : 0;
+        my $getter     = ($opt->{ access_style } && ref($opt->{ access_style }) eq 'CODE');
+        for my $object ( @objects ) {
+            my $data = $row_object ? $object->{$tag}
+                     : $getter     ? $getter->( $object, $tag )
+                     :               $object->$tag();
+            my $list_in_nest = aggregate_joined_columns( $data, $opt );
+            $setter->( $object, $tag, $list_in_nest, $opt );
+        }
+    }
+
+    return wantarray ? @objects : \@objects;
 }
+
+
+sub _nested_cols {
+    my ( $v, $ref_name, $opt_orig, $nest ) = @_;
+
+    Carp::croak("") unless ( exists $v->{ pk } and exists $v->{ tags } );
+
+    my $opt   = {};
+    my $pk    = $v->{ pk };
+    my $tags  = $v->{ tags };
+
+    %$opt = (%$opt_orig, %$v);
+
+    push @$nest, [ $ref_name, $opt ];
+
+    return map {
+        ref($_) eq 'ARRAY' ? $_->[0]
+      : ref($_) eq 'HASH'  ? _nested_cols( $_ )
+      : $_
+    } map { @{$_} } values %$tags;
+}
+
+
+sub _nested_alias {
+    my ( $v ) = @_;
+    my ( $pk, @cols ) = ( $v->{pk}, map { @{$_} } values %{$v->{ tags }} );
+    ( map {
+          ref($_) eq 'ARRAY' ? ($_->[0] => $_->[0])#( $_->[0] => $_->[1] )
+        : ref($_) eq 'HASH'  ? ( _nested_alias($_) )
+        : ( $_ => $_ )
+    } @cols );
+}
+
 
 
 package
