@@ -1,5 +1,3 @@
-DBIx::JoinedColumnsAggregator
-=================
 NAME
     DBIx::JoinedColumnsAggregator - aggregating joined values
 
@@ -14,7 +12,7 @@ SYNOPSYS
     
         $sth->execute();
     
-        my @data = $aggregate_joined_columns( $sth, {
+        my @data = aggregate_joined_columns( $sth, {
             pk => ['id'],
             tags => {
                 product_codes => ['product_code'],
@@ -74,6 +72,202 @@ DESCRIPTION
     NOTE: Duplicated value are ignored. So if you want to aggregate them,
     add other unique constrained column (ex. foreign key) into "tags"
     option.
+
+FUNCTION
+  aggregate_joined_columns
+        $list = aggregate_joined_columns( $iterator, $options );
+        @list = aggregate_joined_columns( $iterator, $options );
+    
+        $list = aggregate_joined_columns( $arrayref, $options );
+        @list = aggregate_joined_columns( $arrayref, $options );
+
+    Takes an iterator or a list reference and returns a list reference
+    (scalar context) or a list (list context).
+
+        # some schema
+        CREATE TABLE recipes (
+            id      integer,
+            name    text,
+            PRIMARY KEY ( id )
+        );
+    
+        CREATE TABLE recipe_product_code_rels (
+            recipe_id       integer,
+            product_code    varchar(10),
+            PRIMARY KEY ( recipe_id, product_code ),
+            FOREIGN KEY ( recipe_id ) REFERENCES recipes (id) ON DELETE CASCADE
+        );
+    
+        CREATE TABLE groups (
+            id      integer,
+            name    text,
+            PRIMARY KEY ( id )
+        );
+    
+        CREATE TABLE recipe_group_rels (
+            recipe_id       integer,
+            group_id        integer,
+            PRIMARY KEY ( recipe_id, group_id ),
+            FOREIGN KEY ( recipe_id ) REFERENCES recipes (id) ON DELETE CASCADE
+            FOREIGN KEY ( group_id ) REFERENCES groups (id) ON DELETE CASCADE
+        );
+    
+        # your program
+        my $dbh = DBI->connect( ... );
+        my $sth = $dbh->prepare(q{
+            SELECT
+                r.id, r.name, code_rel.product_code, g.id AS group_id, g.name AS group_name
+            FROM recipes r
+                LEFT JOIN recipe_product_code_rels code_rel ON r.id = code_rel.recipe_id
+                LEFT JOIN recipe_group_rels group_rel ON r.id = group_rel.recipe_id
+                LEFT JOIN groups g ON g.id = group_rel.group_id
+        });
+    
+        $sth->execute();
+    
+        my $recipes = $aggregate_joined_columns( $sth, {
+            pk => ['id'],
+            tags => {
+                product_codes => ['product_code'],
+                groups        => ['group_id', 'group_name'],
+            },
+            access_style => 'hash',
+            next_method  => 'fetchrow_hashref',
+        } );
+    
+        for my $recipe ( @$recipes ) {
+            ...
+        }
+    
+        # $recipe->{ product_codes }
+        #     => [ 'code1', 'code2', ... ]
+        # 
+        # $recipe->{ groups }
+        #     => [
+        #         { group_id => 1, group_name => 'group A' },
+        #         { group_id => 2, group_name => 'group B' },
+        #         { group_id => 3, group_name => 'group C' },
+        #         ...
+        #     ]
+        #
+
+    In the case of single column in a tag, set a list reference of simple
+    values. Otherwise a list reference of hash references. If no data, set
+    an empty list reference.
+
+   options
+    pk  Primary key(s) for foreign tables.
+
+            pk => [ 'id' ]
+
+        if there is a single primary key, the below code is acceptable too.
+
+            pk => 'id'
+
+    tags
+        A hash reference of tags for grouping and columns .
+
+            tags => {
+                $group_tag1 => [ @tag1_columns ],
+                $group_tag2 => [ @tag2_columns ],
+            }
+
+        Can use array references to set column alias.
+
+            tags => {
+                'books' => [ ['book_id' => 'id'], ['books_title' => 'title'], ... ],
+                ...
+            }
+    
+            ...
+    
+            $data->{'books'}->[0]->{'id'}; # get column value instead of 'book_id'
+
+        Note: single column with an alias in a tag is ignored.
+
+            tags => {
+                'books' => [ ['book_id' => 'id'] ],
+                ...
+            }
+    
+            ...
+    
+            $data->{'books'}->[0]; # get value directly
+
+    access_style
+        Getting objects values style. 'hash' or 'method' or a code reference
+        are acceptable. 'method' by default.
+
+        You can set a subroutin reference to access data flexibly.
+
+            access_style => sub {
+                my ( $object, $column_name ) = @_;
+                return $object->get_column( $column_name );
+            }
+
+        So 'hash' is equivalent to:
+
+            access_style => sub {
+                my ( $object, $column_name ) = @_;
+                return $object->{ $column_name };
+            }
+
+        And 'method' equivalent to:
+
+            access_style => sub {
+                my ( $object, $column_name ) = @_;
+                return $object->$column_name();
+            }
+
+    setter
+        A subroutine reference that sets aggregated values to objects. Four
+        arguments are passed into it. First is an object expected to have
+        aggreaged values. Second is a group tag set by "tags" option. Third
+        is an aggregated values. Last is an option hash reference passed to
+        aggregate_joined_columns.
+
+            setter => sub {
+                my ( $object, $tag, $rows, $options ) = @_;
+                ...
+            }
+
+        Default setter:
+
+            sub {
+                my ( $object, $tag, $rows ) = @_;
+                $object->{ $tag } = $rows;
+            }
+
+    next_method
+        Calling this method against the iterator in
+        aggregate_joined_columns. "next" by default.
+
+        If you pass a list reference into aggregate_joined_columns instead
+        of an iterator, you should not set "netx_method". Because the list
+        reference is wrapped by a dummy iterator class using "next" method
+        in that case.
+
+    always_hash
+        Single target column are aggregated as scalar value. If you set the
+        option with true value, aggregated as hash reference.
+
+            tags => {
+                books => [ 'book_id' ],
+            }
+            # => $object->{ books } : [ 100, 123, .... ]
+    
+    
+            always_hash => 1,
+            tags => {
+                books => [ 'book_id' ],
+            }
+            # => $object->{ books } : [ { book_id => 100 }, { book_id => 123}, .... ]
+
+EXPORT
+    "aggregate_joined_columns" is exported by default.
+
+SEE ALSO
+    DBI, DBIx::Skinny, Teng
 
 AUTHOR
     Makamaka Hannyaharamitu, <makamaka[at]cpan.org>
